@@ -3,7 +3,7 @@ const cors = require('cors');
 const { exec } = require('child_process');
 const app = express();
 
-app.use(cors());
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // 1. Video Info Endpoint (Crash-proof Info Extraction)
