@@ -1,60 +1,72 @@
 const express = require('express');
 const cors = require('cors');
-const ytDlp = require('yt-dlp-exec');
 const app = express();
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// 1. Video Info Endpoint
 app.get('/api/info', async (req, res) => {
     let videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).json({ error: 'URL is required' });
 
     try {
-        const output = await ytDlp(videoUrl, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificates: true,
-            youtubeSkipDashManifest: true,
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url: videoUrl })
         });
 
+        const data = await response.json();
+
+        if (data.status === 'error') {
+            return res.status(400).json({ error: data.text || 'Video details fetch nahi ho sakein.' });
+        }
+
         res.json({
-            title: output.title || 'Untitled Video',
-            uploader: output.uploader || output.uploader_id || 'Unknown Channel',
-            duration: output.duration_string || 'N/A',
-            thumbnail: output.thumbnail || (output.thumbnails && output.thumbnails[0] ? output.thumbnails[0].url : ''),
-            formats: output.formats ? output.formats.map(f => ({
-                format_id: f.format_id,
-                ext: f.ext || 'mp4',
-                resolution: f.resolution || (f.height ? `${f.height}p` : 'HD/SD'),
-                filesize: f.filesize ? `${(f.filesize / 1024 / 1024).toFixed(1)} MB` : 'Auto'
-            })) : []
+            title: 'Media File Ready',
+            uploader: 'Universal Extractor',
+            duration: 'N/A',
+            thumbnail: 'https://via.placeholder.com/400x225?text=Media+Ready',
+            formats: [
+                {
+                    format_id: 'direct',
+                    ext: 'mp4',
+                    resolution: 'HD Quality',
+                    filesize: 'Direct Stream'
+                }
+            ]
         });
     } catch (error) {
-        console.error('yt-dlp error:', error);
-        res.status(500).json({ error: 'Video details fetch nahi ho sakein. Cloud Engine update ho raha hai.' });
+        res.status(500).json({ error: 'Extractor engine response nahi de raha.' });
     }
 });
 
-// 2. Download Endpoint
-app.get('/api/download', (req, res) => {
+app.get('/api/download', async (req, res) => {
     let videoUrl = req.query.url;
-    let format = req.query.format || 'best';
     if (!videoUrl) return res.status(400).send('URL is required');
 
-    res.setHeader('Content-Disposition', 'attachment; filename="video.mp4"');
-    
-    const subprocess = ytDlp.exec(videoUrl, {
-        output: '-',
-        format: format,
-    });
-
-    subprocess.stdout.pipe(res);
+    try {
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url: videoUrl })
+        });
+        const data = await response.json();
+        if (data.url) {
+            res.redirect(data.url);
+        } else {
+            res.status(500).send('Download link generate nahi ho saka.');
+        }
+    } catch (e) {
+        res.status(500).send('Error processing download');
+    }
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
