@@ -1,0 +1,6 @@
+# Allow all Search Engine Crawlers
+User-agent: *
+Allow: /
+
+# Direct path to XML Sitemap
+Sitemap: https://yourdomain.com/sitemap.xml
