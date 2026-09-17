@@ -17,38 +17,38 @@ app.get('/api/info', async (req, res) => {
             noWarnings: true,
             noCallHome: true,
             noCheckCertificates: true,
-            preferFreeFormats: true,
             youtubeSkipDashManifest: true,
         });
 
         res.json({
-            title: output.title,
-            uploader: output.uploader || output.uploader_id || 'Unknown',
+            title: output.title || 'Untitled Video',
+            uploader: output.uploader || output.uploader_id || 'Unknown Channel',
             duration: output.duration_string || 'N/A',
-            thumbnail: output.thumbnail,
+            thumbnail: output.thumbnail || (output.thumbnails && output.thumbnails[0] ? output.thumbnails[0].url : ''),
             formats: output.formats ? output.formats.map(f => ({
                 format_id: f.format_id,
-                ext: f.ext,
-                resolution: f.resolution || (f.height ? `${f.height}p` : 'Audio/Video'),
-                filesize: f.filesize ? `${(f.filesize / 1024 / 1024).toFixed(1)} MB` : 'N/A'
+                ext: f.ext || 'mp4',
+                resolution: f.resolution || (f.height ? `${f.height}p` : 'HD/SD'),
+                filesize: f.filesize ? `${(f.filesize / 1024 / 1024).toFixed(1)} MB` : 'Auto'
             })) : []
         });
     } catch (error) {
         console.error('yt-dlp error:', error);
-        res.status(500).json({ error: 'Video details fetch nahi ho sakein. URL check karein.' });
+        res.status(500).json({ error: 'Video details fetch nahi ho sakein. Cloud Engine update ho raha hai.' });
     }
 });
 
-// 2. Direct Download Endpoint
+// 2. Download Endpoint
 app.get('/api/download', (req, res) => {
     let videoUrl = req.query.url;
+    let format = req.query.format || 'best';
     if (!videoUrl) return res.status(400).send('URL is required');
 
     res.setHeader('Content-Disposition', 'attachment; filename="video.mp4"');
     
     const subprocess = ytDlp.exec(videoUrl, {
         output: '-',
-        format: 'best',
+        format: format,
     });
 
     subprocess.stdout.pipe(res);
