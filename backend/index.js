@@ -5,51 +5,63 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Multi-Source API Extractor Engine
-async function fetchMediaData(videoUrl) {
-    // Public Invidious / Piped API Endpoint
-    const apiUrl = `https://pipedapi.kavin.rocks/streams/${encodeURIComponent(videoUrl.split('v=')[1] || videoUrl.split('/').pop())}`;
-    const response = await fetch(apiUrl);
-    return await response.json();
-}
-
-// 1. Video Info Endpoint
+// 1. Info Endpoint (Invidious Public Engine)
 app.get('/api/info', async (req, res) => {
     let videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).json({ error: 'URL is required' });
 
     try {
-        const data = await fetchMediaData(videoUrl);
+        // Extract Video ID
+        let videoId = "";
+        if (videoUrl.includes('v=')) {
+            videoId = videoUrl.split('v=')[1].split('&')[0];
+        } else if (videoUrl.includes('youtu.be/')) {
+            videoId = videoUrl.split('youtu.be/')[1].split('?')[0];
+        } else if (videoUrl.includes('shorts/')) {
+            videoId = videoUrl.split('shorts/')[1].split('?')[0];
+        } else {
+            videoId = videoUrl.split('/').pop().split('?')[0];
+        }
 
-        if (!data || data.error) {
-            return res.status(400).json({ error: 'Video details fetch nahi ho sakein. Direct main video link paste karein.' });
+        const response = await fetch(`https://inv.tux.pizza/api/v1/videos/${videoId}`);
+        const data = await response.json();
+
+        if (!data || data.error || !data.title) {
+            return res.status(400).json({ error: 'Video details fetch nahi ho sakein. Video ID check karein.' });
+        }
+
+        const formats = [];
+        if (data.formatStreams) {
+            data.formatStreams.forEach(f => {
+                formats.push({
+                    format_id: f.url,
+                    ext: f.container || 'mp4',
+                    resolution: f.qualityLabel || f.quality || '720p',
+                    filesize: 'Direct Download'
+                });
+            });
         }
 
         res.json({
-            title: data.title || 'Media File Ready',
-            uploader: data.uploader || 'Universal Extractor',
-            duration: data.duration ? `${Math.floor(data.duration / 60)} mins` : 'HD Video',
-            thumbnail: data.thumbnailUrl || (data.audioStreams && data.audioStreams[0] ? data.audioStreams[0].url : 'https://via.placeholder.com/400x225'),
-            formats: data.videoStreams ? data.videoStreams.map(v => ({
-                format_id: v.url,
-                ext: v.mimeType.includes('mp4') ? 'mp4' : 'webm',
-                resolution: v.quality || 'HD',
-                filesize: 'Direct Stream'
-            })) : [
-                { format_id: 'direct', ext: 'mp4', resolution: 'HD Quality', filesize: 'Direct Stream' }
+            title: data.title,
+            uploader: data.author || 'YouTube Content',
+            duration: `${Math.floor(data.lengthSeconds / 60)}m ${data.lengthSeconds % 60}s`,
+            thumbnail: data.videoThumbnails && data.videoThumbnails[0] ? data.videoThumbnails[0].url : 'https://via.placeholder.com/400x225',
+            formats: formats.length > 0 ? formats : [
+                { format_id: `https://inv.tux.pizza/latest_version?id=${videoId}&itag=22`, ext: 'mp4', resolution: '720p HD', filesize: 'Direct Stream' }
             ]
         });
     } catch (error) {
-        console.error('Extraction Error:', error);
-        res.status(500).json({ error: 'Engine response nahi de raha. Code link refresh karein.' });
+        console.error('Invidious Error:', error);
+        res.status(500).json({ error: 'Server response nahi de raha. Direct link retry karein.' });
     }
 });
 
-// 2. Direct Download Endpoint
+// 2. Download Redirection Endpoint
 app.get('/api/download', (req, res) => {
     let downloadUrl = req.query.format;
     if (!downloadUrl || downloadUrl === 'direct') {
-        return res.status(400).send('Direct URL not found');
+        return res.status(400).send('Download link available nahi hai');
     }
     res.redirect(downloadUrl);
 });
