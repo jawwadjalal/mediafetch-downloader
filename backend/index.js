@@ -5,12 +5,13 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// 1. Info Endpoint
 app.get('/api/info', async (req, res) => {
     let videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).json({ error: 'URL is required' });
 
     try {
-        const response = await fetch('https://api.cobalt.tools/api/json', {
+        const response = await fetch('https://api.cobalt.tools/', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
@@ -28,28 +29,29 @@ app.get('/api/info', async (req, res) => {
         res.json({
             title: 'Media File Ready',
             uploader: 'Universal Extractor',
-            duration: 'N/A',
+            duration: 'HD Quality',
             thumbnail: 'https://via.placeholder.com/400x225?text=Media+Ready',
             formats: [
                 {
                     format_id: 'direct',
                     ext: 'mp4',
-                    resolution: 'HD Quality',
+                    resolution: 'Best Resolution',
                     filesize: 'Direct Stream'
                 }
             ]
         });
     } catch (error) {
-        res.status(500).json({ error: 'Extractor engine response nahi de raha.' });
+        res.status(500).json({ error: 'Engine response nahi de raha.' });
     }
 });
 
+// 2. Download Endpoint
 app.get('/api/download', async (req, res) => {
     let videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).send('URL is required');
 
     try {
-        const response = await fetch('https://api.cobalt.tools/api/json', {
+        const response = await fetch('https://api.cobalt.tools/', {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
