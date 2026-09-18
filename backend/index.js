@@ -5,43 +5,53 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
+// Helper function for Cobalt API Request
+async function callCobalt(videoUrl) {
+    const response = await fetch('https://api.cobalt.tools/', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        },
+        body: JSON.stringify({
+            url: videoUrl,
+            videoQuality: 'max',
+            youtubeVideoCodec: 'h264'
+        })
+    });
+    return await response.json();
+}
+
 // 1. Info Endpoint
 app.get('/api/info', async (req, res) => {
     let videoUrl = req.query.url;
     if (!videoUrl) return res.status(400).json({ error: 'URL is required' });
 
     try {
-        const response = await fetch('https://api.cobalt.tools/', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url: videoUrl })
-        });
+        const data = await callCobalt(videoUrl);
 
-        const data = await response.json();
-
-        if (data.status === 'error') {
+        if (data.status === 'error' || data.text) {
             return res.status(400).json({ error: data.text || 'Video details fetch nahi ho sakein.' });
         }
 
         res.json({
             title: 'Media File Ready',
-            uploader: 'Universal Extractor',
+            uploader: 'Universal Media Extractor',
             duration: 'HD Quality',
             thumbnail: 'https://via.placeholder.com/400x225?text=Media+Ready',
             formats: [
                 {
                     format_id: 'direct',
                     ext: 'mp4',
-                    resolution: 'Best Resolution',
+                    resolution: 'Best Quality (HD/4K)',
                     filesize: 'Direct Stream'
                 }
             ]
         });
     } catch (error) {
-        res.status(500).json({ error: 'Engine response nahi de raha.' });
+        console.error('Cobalt Error:', error);
+        res.status(500).json({ error: 'Engine response nahi de raha. Link check karein.' });
     }
 });
 
@@ -51,15 +61,7 @@ app.get('/api/download', async (req, res) => {
     if (!videoUrl) return res.status(400).send('URL is required');
 
     try {
-        const response = await fetch('https://api.cobalt.tools/', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ url: videoUrl })
-        });
-        const data = await response.json();
+        const data = await callCobalt(videoUrl);
         if (data.url) {
             res.redirect(data.url);
         } else {
